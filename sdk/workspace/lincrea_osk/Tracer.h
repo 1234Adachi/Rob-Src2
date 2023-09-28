@@ -19,10 +19,8 @@ public:
 
     void moveRoboOnOf(RoboBody& robo, int8_t maxPower);
 
-    void moveRoboPID(RoboBody& robo,int8_t maxPower);
+    void moveRoboPID(RoboBody& robo,int8_t maxPower,int8_t edge);
     
-    void ChangemoveRoboPID(RoboBody& robo, int8_t maxPower);
-
     inline
     static int getBrightness(const rgb_raw_t& rawColor){
         // 青線部分の影響を排除する為、、blueは足さない

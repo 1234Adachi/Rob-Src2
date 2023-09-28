@@ -59,7 +59,6 @@ Tracer::calcPID(int8_t& leftPower, int8_t& rightPower,int8_t maxPower,const rgb_
     
     // 左エッジトレースなら、左右のパワーをスワップ
     if(lineSide == LEFT){
-        syslog(LOG_NOTICE,"lineSide == LEFT ************************");
         int8_t power = leftPower;
         leftPower = rightPower;
         rightPower = power;
@@ -126,23 +125,16 @@ Tracer::moveRoboOnOf(RoboBody& robo, int8_t maxPower){
 
 // P制御
 void 
-Tracer::moveRoboPID(RoboBody& robo, int8_t maxPower){
+Tracer::moveRoboPID(RoboBody& robo, int8_t maxPower,int8_t edge){
     rgb_raw_t rawColor;
     robo.getColor(rawColor);
 
     int8_t leftPower, rightPower;
-    calcPID(leftPower,rightPower,maxPower,rawColor);
-    robo.setPower(leftPower, rightPower);
+    if(edge == 0){
+      calcPID(leftPower,rightPower,maxPower,rawColor);
+      robo.setPower(leftPower, rightPower);
+    }else if(edge == 1){
+      calcPID(rightPower,leftPower,maxPower,rawColor);
+      robo.setPower(leftPower, rightPower);
+    }
 }
-
-// P制御（左ラインエッジ）
-void
-Tracer::ChangemoveRoboPID(RoboBody& robo, int8_t maxPower){
-    rgb_raw_t rawColor;
-    robo.getColor(rawColor);
-
-    int8_t leftPower, rightPower;
-    calcPID(rightPower,leftPower,maxPower,rawColor);
-    robo.setPower(leftPower, rightPower);
-}
-

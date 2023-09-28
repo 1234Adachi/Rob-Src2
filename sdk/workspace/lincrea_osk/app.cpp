@@ -13,10 +13,16 @@ static int phase = 0;
 int loopCount = 0;
 // 動作継続フラグ
 bool doContinue = true;
-// 90度旋回
-int turnloop = 0;
 // 直進開始
 int startTime = 0;
+// 右コース
+int rightCrs = 0;
+// 右エッジフラグ
+int rightEg = 0;
+// 左エッジフラグ
+int leftEg = 1;
+// エッジ判定
+int edge = 0;
 
 
 void main_task(intptr_t unused) {
@@ -88,10 +94,8 @@ bool moveRobo(RoboBody& robo, Tracer& tracer, ev3api::Clock& clock){
         phase = 1;
         goto ONCE_MORE;
       }
-      tracer.moveRoboPID(robo,50); // スタートは若干遅め
-      //robo.setPower(70,70);
+      tracer.moveRoboPID(robo,50,edge); // スタートは若干遅め
       break;
-
 
     case 1: // スタートから第１カーブまで
       if(3.0 < position.x){ 
@@ -99,216 +103,203 @@ bool moveRobo(RoboBody& robo, Tracer& tracer, ev3api::Clock& clock){
         phase = 2;
         goto ONCE_MORE;
       }
-      tracer.moveRoboPID(robo,75); // 全速力で走る
-      
+      tracer.moveRoboPID(robo,75,edge); // 全速力で走る
       break;
 
     case 2: // 第１カーブ
-      if(-0.35 > position.y){ 
+      if(-0.8 > position.y){ 
+        robo.setPower(40,60);
+        clock.sleep(60000);
+        edge = leftEg; // 左ラインエッジに変更
         syslog(LOG_NOTICE,"switch to case 3 ************************");
         phase = 3;
         goto ONCE_MORE;
+      }else if(0.8 < position.y){
+        syslog(LOG_NOTICE,"switch to case 3 ************************");
+        rightCrs = 1;
+        phase = 3;
+        goto ONCE_MORE;
       }
-      tracer.moveRoboPID(robo,50); // ちょっとスピードを抑える 
+      tracer.moveRoboPID(robo,60,edge); // ちょっとスピードを抑える 
       break;
     
     case 3: // 第１カーブから第２カーブまで
-      if(-2.0 > position.y ){ // 
+      if(-2.0 > position.y || 2.0 < position.y){ // 
         syslog(LOG_NOTICE,"switch to case 4 ************************");
         phase = 4;
         goto ONCE_MORE;
       }
-      tracer.moveRoboPID(robo,70); // 全速力で走る
-      //robo.setPower(80,80);
+      tracer.moveRoboPID(robo,60,edge); // ちょっとスピードを抑える
       break;
 
-    case 4: // 第２カーブ
-      if(3.4 > position.x){ 
+    case 4: // 第２カーブからダブルループ入るまで
+      if(colorNumber == COLOR_BLUE){ 
+        robo.setPower(60,40);
+        clock.sleep(500000);
         syslog(LOG_NOTICE,"switch to case 5 ************************");
+        phase = 5;
+        goto ONCE_MORE;
+      }else if(colorNumber == COLOR_BLUE && rightCrs == 1){
+        robo.setPower(40,60);
+        clock.sleep(500000);
+        syslog(LOG_NOTICE,"switch to case 5 ************************");
+        phase = 5;
+      }
+      tracer.moveRoboPID(robo,60,edge); // ちょっとスピードを抑える
+      break;
+
+    case 5: // 2つ目のループ侵入・2つ目のループ内にいることを確認
+      if((-0.7 < position.y && position.y < 0)
+         || (0 < position.y && position.y < 0.7)){ // 
+        syslog(LOG_NOTICE,"switch to case 6 ************************");
         phase = 6;
         goto ONCE_MORE;
       }
-      tracer.moveRoboPID(robo,50); // ちょっとスピードを抑える
+      tracer.moveRoboPID(robo,60,edge); // ちょっとスピードを抑える
+      break;
+  
+    case 6:// 1つ目のループに戻る
+
+      if(2.5 > position.x && colorNumber == COLOR_BLUE){ // 
+        if(rightCrs == 1){ // 右コースの場合
+          edge = leftEg; // 左ラインエッジに変更
+        }else{             // 左コースの場合
+          edge = rightEg; // 右ラインエッジに変更
+        }
+        syslog(LOG_NOTICE,"switch to case 7 ************************");
+        phase = 7;
+        goto ONCE_MORE;
+      }
+      tracer.moveRoboPID(robo,60,edge); // ちょっとスピードを抑える
       break;
 
-    // case 5: // LAPまで
-    //   if(3.0 > position.x ){ // 
-    //     syslog(LOG_NOTICE,"switch to case 6 ************************");
-    //     phase = 6;
-    //     goto ONCE_MORE;
-    //   }
-    //   tracer.moveRoboPID(robo,70); // 全速力で走る
-    //   break;
+    case 7:// 1つ目のループ内にいることを確認
+      if(-1.5 > position.y || position.y > 1.5){ // 
+        syslog(LOG_NOTICE,"switch to case 8 ************************");
+        phase = 8;
+        goto ONCE_MORE;
+      }
+      tracer.moveRoboPID(robo,60,edge); // ちょっとスピードを抑える
+      break;
 
-    case 6: // 1つ目のループに入る
-    
-    if(2.5 > position.x && colorNumber == COLOR_BLUE){ // 
-      syslog(LOG_NOTICE,"switch to case 7 ************************");
-      phase = 7;
+    case 8:// 180度旋回まで
+      if(2.5 > position.x && colorNumber == COLOR_BLUE){ // 
+        syslog(LOG_NOTICE,"switch to case 9 ************************");
+        phase = 9;
+        goto ONCE_MORE;
+      }
+      tracer.moveRoboPID(robo,60,edge); // ちょい抑えめ
+      break;
+
+    case 9: // 180度旋回
+      if(rightCrs == 1) {
+        robo.setPower(30,-30);
+      }else{
+        robo.setPower(-30,30);
+      }
+      clock.sleep(1400000);
+      syslog(LOG_NOTICE,"switch to case 10 ************************");
+      phase =10;
+      break; 
+
+    case 10:// ダブルループを出る
+      if(colorNumber == COLOR_BLUE){ // 
+        syslog(LOG_NOTICE,"switch to case 11 ************************");
+        phase = 11;
+        goto ONCE_MORE;
+      }
+      tracer.moveRoboPID(robo,60,edge); // ちょい抑える
+      break;
+
+    case 11: // 180度旋回
+      if(colorNumber == COLOR_BLACK && rightCrs == 1){
+        robo.setPower(30,-30);
+        clock.sleep(1600000);
+        edge = rightEg; // 右ラインエッジに変更
+        syslog(LOG_NOTICE,"switch to case 12 ************************");
+        phase =12;
+        goto ONCE_MORE;
+      }else if(colorNumber == COLOR_BLACK) {  
+        robo.setPower(-30,30);
+        clock.sleep(1600000);
+        edge = leftEg; // 左ラインエッジに変更
+        syslog(LOG_NOTICE,"switch to case 12 ************************");
+        phase =12;
+        goto ONCE_MORE;
+      }
+      tracer.moveRoboPID(robo,60,edge); // ちょい抑える
+      break;
+
+    case 12: // トレジャー de ハンター開始
+      if(colorNumber == COLOR_RED){ // 
+        syslog(LOG_NOTICE,"switch to case 13 ************************");
+        phase = 13;
+        goto ONCE_MORE;
+      }
+      tracer.moveRoboPID(robo,70,edge); // 全力で走る
+      break;
+
+    case 13: // 90度旋回して難所へ
+      if(rightCrs == 1){
+        robo.setPower(-30,30);
+      }else{
+        robo.setPower(30,-30);
+      }
+      clock.sleep(800000);
+      startTime = clock.now();
+      syslog(LOG_NOTICE,"switch to case 14 ************************");
+      phase = 14;
       goto ONCE_MORE;
-    }
-    tracer.moveRoboPID(robo,60); // ちょい抑えめ
     break;
-
-    case 7: // 2つ目のループに入る
     
-    if(-0.7 < position.y){ // 
-      syslog(LOG_NOTICE,"switch to case 8 ************************");
-      phase = 8;
-      goto ONCE_MORE;
-    }
+    case 14: // 90度旋回後、ゴールへ
+      if(endTime-startTime > 9000000){ 
+        if(colorNumber == COLOR_BLACK){
+          syslog(LOG_NOTICE,"switch to case 15 ************************");
+          phase = 15;
+          goto ONCE_MORE;
+        }
+        robo.setPower(50,50);
+      }
+      robo.setPower(50,50);
+      break;
 
-    tracer.ChangemoveRoboPID(robo,60); // 全速力で走る
-    break;
-  
-  case 8:// 1つ目のループに戻る
-
-  if(2.5 > position.x && colorNumber == COLOR_BLUE){ // 
-    syslog(LOG_NOTICE,"switch to case 9 ************************");
-    phase = 9;
-    goto ONCE_MORE;
-  }
-  tracer.ChangemoveRoboPID(robo,60); // ちょい抑えめ
-  break;
-
-  case 9:// 1つ目のループに戻る
-
-  if(-1.5 > position.y){ // 
-    syslog(LOG_NOTICE,"switch to case 10 ************************");
-    phase = 10;
-    goto ONCE_MORE;
-  }
-  tracer.moveRoboPID(robo,60); // ちょい抑えめ
-  break;
-
-  case 10:// 1つ目のループに戻る
-
-  if(2.5 > position.x && colorNumber == COLOR_BLUE){ // 
-    syslog(LOG_NOTICE,"switch to case 11 ************************");
-    phase = 11;
-    goto ONCE_MORE;
-  }
-  tracer.moveRoboPID(robo,60); // ちょい抑えめ
-  break;
-
-  case 11: // 180度旋回
-       
-  robo.setPower(-30,30);
-  clock.sleep(1400000);
-  syslog(LOG_NOTICE,"switch to case 12 ************************");
-  phase =12;
-
-  break; 
-
-  case 12:// 直帰
-
-  if(3.4 < position.x){ // 
-    syslog(LOG_NOTICE,"switch to case 13 ************************");
-    phase = 13;
-    goto ONCE_MORE;
-  }
-  tracer.moveRoboPID(robo,70); // ちょい抑えめ
-
-  break;
-
-  case 13: // 180度旋回
-       
-  robo.setPower(-30,30);
-  clock.sleep(1600000);
-  syslog(LOG_NOTICE,"switch to case 14 ************************");
-  phase =14;
-
-  break;
-
-  case 14: // 配置のやつ開始
-       
-  if(colorNumber == COLOR_RED){ // 
-    syslog(LOG_NOTICE,"switch to case 15 ************************");
-    phase = 15;
-    goto ONCE_MORE;
-  }
-  tracer.ChangemoveRoboPID(robo,60); // ちょい抑えめ
-
-  break;
-
-  case 15: // 90度旋回して難所へ
-
-  if(turnloop == 0){
-    syslog(LOG_NOTICE,"90度旋回 ************************");
-    robo.setPower(30,-30);
-    clock.sleep(840000);
-    startTime = clock.now();
-  }else if(endTime-startTime > 8000000){ 
-    if(colorNumber == COLOR_BLACK){
-      turnloop = 0;
+    case 15: // 90度旋回してゴールへ
+      if(rightCrs == 1){
+        robo.setPower(30,-30);
+      }else{
+        robo.setPower(-30,30);
+      }
+      clock.sleep(800000);
       syslog(LOG_NOTICE,"switch to case 16 ************************");
       phase = 16;
       goto ONCE_MORE;
-    }
-    robo.setPower(50,50);
-  }
+      break;
 
-  robo.setPower(50,50);
-  turnloop++;
-  break;
+    case 16: // ゴールへ
+      if(colorNumber == COLOR_BLUE){ // 
+        syslog(LOG_NOTICE,"switch to case 50 ************************");
+        phase = 50;
+        goto ONCE_MORE;
+      }
+      tracer.moveRoboPID(robo,50,edge); // ちょい抑える
+      break;
 
-  case 16: // 90度旋回して難所へ
+    case 49:// 直帰
+      if(0.0 > position.x && colorNumber == COLOR_BLUE){ // 
+        syslog(LOG_NOTICE,"switch to case 13 ************************");
+        phase = 50;
+        goto ONCE_MORE;
+      }
+      tracer.moveRoboPID(robo,70,edge); // ちょい抑えめ
+      break;
 
-  // if(colorNumber == COLOR_BLACK){ // 
-  //   // robo.setPower(0,30);
-  //   syslog(LOG_NOTICE,"switch to case 17 ************************");
-  //   phase = 17;
-  //   goto ONCE_MORE;
-  // }
-  robo.setPower(-30,30);
-  clock.sleep(800000);
-  syslog(LOG_NOTICE,"switch to case 16 ************************");
-  phase = 16;
-  break;
-
-  case 17: // 90度旋回してゴールへ
-  if(turnloop == 0){
-    syslog(LOG_NOTICE,"90度旋回 ************************");
-    robo.setPower(30,-30);
-    clock.sleep(840000);
-    startTime = clock.now();
-
-  }else if(colorNumber == COLOR_BLUE){ // 
-    syslog(LOG_NOTICE,"switch to case 50 ************************");
-    phase = 50;
-    goto ONCE_MORE;
-  }
-  tracer.ChangemoveRoboPID(robo,50); // ちょい抑えめ
-  turnloop++;
-
-  break;
-
-
-
-
-
-
-
-
-  case 49:// 直帰
-
-  if(-0.1 > position.x){ // 
-    syslog(LOG_NOTICE,"switch to case 13 ************************");
-    phase = 50;
-    goto ONCE_MORE;
-  }
-  tracer.moveRoboPID(robo,70); // ちょい抑えめ
-  break;
-
-
-case 50: // 停止
-// 今回はここで止まる…あとは任せた！
-robo.setPower(0,0);
-doContinue = false;
-break;
+    case 50: // 停止
+      robo.setPower(0,0);
+      doContinue = false;
+      break;
 
   }  
-
   return doContinue;
 }
 
