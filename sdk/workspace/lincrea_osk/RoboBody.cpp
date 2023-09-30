@@ -14,7 +14,9 @@ int32_t
 Wheel::getDelta(){
     int32_t count = motor.getCount();
     int32_t delta = count - lastCount;
+
     lastCount = count;
+    
     return delta;
 }
 
@@ -22,7 +24,7 @@ Wheel::getDelta(){
 /**********************************************************************
  * RoboBody関連メソッド
  **********************************************************************/
-RoboBody::RoboBody() : left(PORT_C),right(PORT_B), colorSensor(PORT_3), touchSensor(PORT_1) {
+RoboBody::RoboBody() : left(PORT_C),right(PORT_B), colorSensor(PORT_2), touchSensor(PORT_1) {
         // Do Nothing
 }
 
