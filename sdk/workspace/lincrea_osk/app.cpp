@@ -69,7 +69,13 @@ void main_task(intptr_t unused) {
     if(loopCount % 100 == 0){
       int brightness = tracer.getLastBrightness();
       syslog(LOG_NOTICE,"Brightness:%d",brightness);
-      
+      //青色反射光の強さ
+      rgb_raw_t rawColor;
+      robo.getColor(rawColor);
+      isBlue = tracer.isBlue(rawColor);
+      if (isBlue){
+            printf("blue\n");
+      }
       Position& position = robo.getPosition();
       syslog(LOG_NOTICE,position.toString());
     }
@@ -86,13 +92,6 @@ void main_task(intptr_t unused) {
 bool moveRobo(RoboBody& robo, Tracer& tracer, ev3api::Clock& clock){
   //座標
   const Position& position = robo.calcNewPosition();
-  //青色反射光の強さ
-  rgb_raw_t rawColor;
-  robo.getColor(rawColor);
-  isBlue = tracer.isBlue(rawColor);
-  if (isBlue){
-        printf("blue\n");
-  }
   
   //現在の時刻
   int endTime = clock.now();
@@ -107,7 +106,7 @@ bool moveRobo(RoboBody& robo, Tracer& tracer, ev3api::Clock& clock){
         phase = 1;
         goto ONCE_MORE;
       }
-      tracer.moveRoboPID(robo,70,edge); // スタートは若干遅め
+      tracer.moveRoboPID(robo,60,edge); // スタートは若干遅め
       break;
 
     case 1: // スタートから第１カーブまで
@@ -116,7 +115,7 @@ bool moveRobo(RoboBody& robo, Tracer& tracer, ev3api::Clock& clock){
         phase = 2;
         goto ONCE_MORE;
       }
-      tracer.moveRoboPID(robo,50,edge); // 全速力で走る
+      tracer.moveRoboPID(robo,60,edge); // 全速力で走る
       break;
 
     case 2: // 第１カーブ
@@ -134,53 +133,47 @@ bool moveRobo(RoboBody& robo, Tracer& tracer, ev3api::Clock& clock){
         phase = 3;
         goto ONCE_MORE;
       }
-      tracer.moveRoboPID(robo,70,edge); // ちょっとスピードを抑える 
+      tracer.moveRoboPID(robo,60,edge); // ちょっとスピードを抑える 
       break;
     
     case 3: // 第１カーブから第２カーブまで
       if(-1.8 > position.y || 1.8 < position.y){ // 
-        syslog(LOG_NOTICE,"switch to case 4 ************************");
+        syslog(LOG_NOTICE,"***************************** switch to case 4 ************************");
         phase = 4;
-        tempAngle = position.angle;
-        printf("tempAngle: %lf\n", tempAngle);
         goto ONCE_MORE;
       }
-      tracer.moveRoboPID(robo,65,edge); // ちょっとスピードを抑える
+      tracer.moveRoboPID(robo,60,edge); // ちょっとスピードを抑える
       break;
 
     case 4: // 第２カーブからダブルループ入るまで
       if(isBlue && rightCrs == 1){ 
         printf("loop start\n");
         printf("tempAngle: %lf\n", tempAngle);
-        //while (true){
-          
-        //  robo.setPower(30, 60);
-        //  if (abs(position.angle - tempAngle) > 0.26){
-        //    break;
-        //  }
-        //}   
-        //printf("angle_now: %lf\n", position.angle); 
-        //robo.setPower(40,60);
-        //clock.sleep(1000000);
-        syslog(LOG_NOTICE,"switch to case 5 ************************");
+        syslog(LOG_NOTICE,"***************************** switch to case 48 ************************");
         phase = 48;
         goto ONCE_MORE;
       }else if(isBlue){
-        robo.setPower(60,40);
-        clock.sleep(400000);
-        //robo.setPower(40,60);
-        //clock.sleep(10000000);
-        syslog(LOG_NOTICE,"switch to case 5 ************************");
-        phase = 48;
+        tempAngle = position.angle;
+        printf("tempAngle: %lf\n", tempAngle);
+        while (true){
+          
+          robo.setPower(60, 30);
+          if (abs(position.angle - tempAngle) > 0.2){
+            break;
+          }
+        }   
+        printf("angle_now: %lf\n", position.angle); 
+        syslog(LOG_NOTICE,"***************************** switch to case 5 ************************");
+        phase = 5;
         goto ONCE_MORE;
       }
       tracer.moveRoboPID(robo,60,edge); // ちょっとスピードを抑える
       break;
 
     case 5: // 2つ目のループ侵入・2つ目のループ内にいることを確認
-      if((-0.7 < position.y && position.y < 0)
-         || (0 < position.y && position.y < 0.7)){ // 
-        syslog(LOG_NOTICE,"switch to case 6 ************************");
+      if((-1 < position.y && position.y < 0)
+         || (0 < position.y && position.y < 1)){ // 
+        syslog(LOG_NOTICE,"***************************** switch to case 6 ************************");
         phase = 6;
         goto ONCE_MORE;
       }
@@ -189,17 +182,17 @@ bool moveRobo(RoboBody& robo, Tracer& tracer, ev3api::Clock& clock){
   
     case 6:// 1つ目のループに戻る
 
-      if(2.5 > position.x && isBlue){ // 
+      if(isBlue){ // 
         if(rightCrs == 1){ // 右コースの場合
           edge = leftEg; // 左ラインエッジに変更
         }else{             // 左コースの場合
           edge = rightEg; // 右ラインエッジに変更
         }
-        syslog(LOG_NOTICE,"switch to case 7 ************************");
+        syslog(LOG_NOTICE,"**************************** switch to case 7 ************************");
         phase = 7;
         goto ONCE_MORE;
       }
-      tracer.moveRoboPID(robo,50,edge); // ちょっとスピードを抑える
+      tracer.moveRoboPID(robo,60,edge); // ちょっとスピードを抑える
       break;
 
     case 7:// 1つ目のループ内にいることを確認

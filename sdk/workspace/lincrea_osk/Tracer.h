@@ -17,6 +17,8 @@ public:
 
     void calcPID(int8_t& leftPower, int8_t& rightPower,int8_t maxPower,const rgb_raw_t& rawColor);
 
+    void calcPD(int8_t& leftPower, int8_t& rightPower,int8_t maxPower,const rgb_raw_t& rawColor,int& prevDiff);
+    
     void moveRoboOnOf(RoboBody& robo, int8_t maxPower);
 
     void moveRoboPID(RoboBody& robo,int8_t maxPower,int8_t edge);
@@ -49,7 +51,7 @@ public:
         int maxColorType = 0; // 0:赤 1:緑 2:青
         int h; //色相
         double s; //彩度
-        int v; //明度
+        double v; //明度
         int count = 0;
         for (int i: arrayRgb) {
             if (i < minColor) {
@@ -78,9 +80,12 @@ public:
 
         // 明度(v)を求める
         v = maxColor;
-        //printf("r: %d, g: %d, b: %d\n", rawColor.r, rawColor.g, rawColor.b);
-        //printf("h: %d, s: %lf, v: %d\n", h, s, v);
-        if (180 < h < 300 && 0.8 < s){
+        
+        printf("r: %d, g: %d, b: %d\n", rawColor.r, rawColor.g, rawColor.b);
+        printf("maxColor: %lf, minColor: %lf\n", maxColor, minColor);
+        printf("h: %d, s: %lf, v: %lf\n", h, s, v);
+        if (200 < h < 280 && 0.28 < s && 30 < v){
+            printf("h: %d, s: %lf, v: %d\n", h, s, v);
             blue = true;
         }
         
@@ -92,6 +97,7 @@ protected:
     int grayBrightness;
 
     int lastBrightness;
+    int prevDiff;
 };
 
 #endif // TRACER_H
